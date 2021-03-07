@@ -13,11 +13,15 @@ jdk中包含了jvm和“屏蔽操作系统差异的组件”
 
 生命周期： 类的加载->连接->初始化->使用->卸载
 
+**（速记：加强连出师不利）**
+
 -  类的加载
 
   查找并加载类的二进制数据（class文件）
 
   硬盘上的class文件 加载到jvm内存中
+
+  类何时加载，由不通的虚拟机具体实现
 
 - 连接 ：确定类与类之间的关系  ； student.setAddress( address ); 
 
@@ -67,6 +71,22 @@ jvm结束生命周期的时机：
 - System.exit()
 - 操作系统异常
 
+## 类的初始化顺序
+
+1. 正常类的加载顺序：静态变量/静态代码块 -> main方法 -> 非静态变量/代码块 -> 构造方法
+    >说明：静态代码块与静态变量的执行顺序同代码定义的顺序；非静态变量与代码块的执行顺序同代码执行顺序
+2. 继承情况下父类与子类的加载顺序：   
+   父类–静态变量/父类–静态初始化块
+   
+   子类–静态变量/子类–静态初始化块
+   
+   父类–变量/父类–初始化块
+   
+   父类–构造器
+   
+   子类–变量/子类–初始化块
+   
+   子类–构造器
 
 
 ## JVM内存模型（Java Memoery Model，简称JMM）
@@ -130,7 +150,7 @@ JVM要求以上的8个动作必须是原子性的;jvm但是对于64位的数据�
 
 重排序：排序的对象就是 原子性操作，目的是为了提高执行效率，优化
 
-```java
+```
 int a  =10 ; //1    int a ; a = 10 ;
 int b ;//2
 b = 20 ;//3
@@ -139,7 +159,7 @@ int c = a * b ;//4
 
 重排序“不会影响**单线程**的执行结果”，因此以上程序在经过重排序后，可能的执行结果：1,2,3,4 ；2,3,1,4
 
-```java
+```
 //2 3 1 4
 int b ;
 b = 20 ;
@@ -216,13 +236,13 @@ volatile是通过“内存屏障”防止重排序问题：
 
 ![1568883650128](jvm笔记.assets/1568883650128.png)
 
-## 程序计数器
+### 程序计数器
 
 程序计数器：行号指示器，指向当前线程所执行的字节码指令的地址
 
 Test.java -> Test.class
 
-```java
+```
 int num = 1;   //1
 int num2 = 2 ; //2
 if(num1>num2){//3
@@ -249,7 +269,7 @@ goto的本质就是改变的 程序计数器的值（java中没有goto，goto在
 
 
 
-## 虚拟机栈
+### 虚拟机栈
 
 定义：描述 方法执行的内存模型
 
@@ -266,13 +286,13 @@ public static void main(String[] args) {
 }
 ```
 
-## 本地方法栈
+### 本地方法栈
 
 原理和结构与虚拟机栈一致，不同点： 虚拟机栈中存放的 jdk或我们自己编写的方法，而本地方法栈调用的 操作系统底层的方法。
 
 ![1568887498037](jvm笔记.assets/1568887498037.png)
 
-## 堆
+### 堆
 
 ![1568940940376](jvm笔记.assets/1568940940376.png)
 
@@ -303,8 +323,6 @@ public static void main(String[] args) {
   
 
   老生代： 1.生命周期比较长的对象  2.大的对象； 使用的回收器 MajorGC\FullGC
-
-  
 
   新生代特点： 
 
@@ -360,7 +378,7 @@ public class TestHeap {
 
 
 
-## 方法区
+### 方法区
 
 存放：类的元数据（描述类的信息）、常量池、方法信息（方法数据、方法代码）
 
@@ -386,7 +404,7 @@ gc：类的元数据（描述类的信息）、常量池
 
 类的初始化：JVM只会在**“首次主动使用”**一个类/接口时，才会初始化它们 。
 
-## 主动使用
+### 主动使用
 
 1.new 构造类的使用 
 
@@ -444,7 +462,7 @@ public class Test2 {
 
 特殊情况：
 
-- 如果成员变量既是static，又是final ，即常量，则不会被初始化
+- 如果成员变量既是static，又是final ，即常量（即被final修饰的静态变量），则不会被初始化
 - 上一种情况中，如果常量的值 是一个随机值，则会被初始化 (为了安全)
 
 
@@ -458,16 +476,21 @@ public class Son extends  Father {
         new Son();
     }
 }
-
 ```
 
 5.动态语言在执行所涉及的类 也会被初始化（动态代理）
 
 
 
-## 被动使用
+### 被动使用
 
-除了主动以外，其他都是被动使用。
+除了主动以外，其他都是被动使用。包括
+
+1.子类调用父类的静态变量，子类不会被初始化。只有父类被初始化。。对于静态字段，只有直接定义这个字段的类才会被初始化.
+
+2.通过数组定义来引用类，不会触发类的初始化
+
+3.访问类的常量，不会初始化类
 
 ```java
 package init;
@@ -484,10 +507,48 @@ public class BeiDong {
 
     }
 }
-
 ```
 
 以上代码，不属于主动使用类，因此不会被初始化。
+
+### 面试题
+```java
+class SingleTon {
+    private static SingleTon singleTon = new SingleTon();
+    public static int count1;
+    public static int count2 = 0;
+ 
+    private SingleTon() {
+        count1++;
+        count2++;
+    }
+ 
+    public static SingleTon getInstance() {
+        return singleTon;
+    }
+}
+ 
+public class Test {
+    public static void main(String[] args) {
+        SingleTon singleTon = SingleTon.getInstance();
+        System.out.println("count1=" + singleTon.count1);
+        System.out.println("count2=" + singleTon.count2);
+    }
+}
+```
+分析[参考](https://www.cnblogs.com/fnlingnzb-learner/p/11990943.html) :
+
+1. SingleTon singleTon = SingleTon.getInstance();调用了类的SingleTon调用了类的静态方法，触发类SingleTon的初始化
+
+2. SingleTon类加载的时候在准备过程中为类的静态变量分配内存并初始化默认值，
+   `singleton=null;count1=0;count2=;`
+
+3. SingleTon类初始化，为类的静态变量赋值和执行静态代码快。
+   因此需要对`singleton`、`count1`、`count2`三个静态变量按顺序依次进行赋值操作。
+   singleton赋值为new SingleTon()调用类的构造方法（调用类的构造方法后count=1;count2=1）
+
+4. 继续为静态变量count1与count2赋值,此时count1没有赋值操作,所有count1为1；
+   **但是**count2执行赋值操作`count2 = 0`后就变为0
 
 
 
